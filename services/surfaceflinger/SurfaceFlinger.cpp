@@ -230,6 +230,11 @@ namespace {
 
 static constexpr int FOUR_K_WIDTH = 3840;
 static constexpr int FOUR_K_HEIGHT = 2160;
+static constexpr char kOplusRefreshRateProperty[] = "vendor.display.oplus_refresh_rate";
+
+bool shouldUseOplusMinFpsOverlay() {
+    return base::GetIntProperty(kOplusRefreshRateProperty, 0) > 0;
+}
 
 // TODO(b/141333600): Consolidate with DisplayMode::Builder::getDefaultDensity.
 constexpr float FALLBACK_DENSITY = ACONFIGURATION_DENSITY_TV;
@@ -1040,7 +1045,7 @@ void SurfaceFlinger::init() FTL_FAKE_GUARD(kMainThreadContext) {
                                 display->updateRefreshRateOverlayRate(vsyncRate, renderRate);
                             }
                         }));
-                        if (base::GetBoolProperty("debug.sf.show_oplus_min_fps_overlay", false)) {
+                        if (shouldUseOplusMinFpsOverlay()) {
                             for (const nsecs_t delay : {ms2ns(250), ms2ns(750), ms2ns(1500)}) {
                                 static_cast<void>(mScheduler->scheduleDelayed(
                                         [=, this]() FTL_FAKE_GUARD(kMainThreadContext) {
@@ -2570,7 +2575,7 @@ void SurfaceFlinger::onComposerHalVsyncIdle(hal::HWDisplayId hwcDisplayId) {
     SFTRACE_CALL();
     mScheduler->forceNextResync();
 
-    if (!base::GetBoolProperty("debug.sf.show_oplus_min_fps_overlay", false)) {
+    if (!shouldUseOplusMinFpsOverlay()) {
         return;
     }
 
@@ -7759,7 +7764,7 @@ void SurfaceFlinger::kernelTimerChanged(PhysicalDisplayId displayId, bool expire
         }
     }));
 
-    if (expired && base::GetBoolProperty("debug.sf.show_oplus_min_fps_overlay", false)) {
+    if (expired && shouldUseOplusMinFpsOverlay()) {
         static_cast<void>(mScheduler->scheduleDelayed([=, this]() FTL_FAKE_GUARD(kMainThreadContext) {
             const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayId));
             if (!display || !display->isRefreshRateOverlayEnabled()) return;
@@ -7784,7 +7789,7 @@ void SurfaceFlinger::vrrDisplayIdle(PhysicalDisplayId displayId, bool idle) {
         }
     }));
 
-    if (idle && base::GetBoolProperty("debug.sf.show_oplus_min_fps_overlay", false)) {
+    if (idle && shouldUseOplusMinFpsOverlay()) {
         static_cast<void>(mScheduler->scheduleDelayed([=, this] {
             if (const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayId))) {
                 if (!display->isRefreshRateOverlayEnabled()) return;
@@ -9003,7 +9008,7 @@ status_t SurfaceFlinger::setSmallAreaDetectionThreshold(int32_t appId, float thr
 void SurfaceFlinger::enableRefreshRateOverlay(bool enable) {
     bool setByHwc = getHwComposer().hasCapability(Capability::REFRESH_RATE_CHANGED_CALLBACK_DEBUG);
     const bool showOplusMinFps =
-            base::GetBoolProperty("debug.sf.show_oplus_min_fps_overlay", false);
+            shouldUseOplusMinFpsOverlay();
     if (showOplusMinFps) {
         setByHwc = false;
     }
